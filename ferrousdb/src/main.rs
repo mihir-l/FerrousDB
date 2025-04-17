@@ -1,8 +1,5 @@
 use storage::Store;
 
-mod server;
-mod storage;
-
 fn main() {
     let port = 8080;
     let store = Store::init();

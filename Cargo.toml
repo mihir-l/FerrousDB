@@ -1,6 +1,11 @@
-[package]
-name = "Ferrousdb"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+members = ["ferrousdb", "crates/*"]
 
-[dependencies]
+[workspace.package]
+authors = ["mihir-l"]
+edition = "2024"
+rust-version = "1.86"
+repository = "https://github.com/mihir-l/FerrousDB.git"
+
+[workspace.dependencies]

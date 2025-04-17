@@ -5,11 +5,11 @@ use std::{
     thread,
 };
 mod protocol;
-use protocol::Request;
+use protocol::{Operation, Request, Response, Status};
 
-use crate::storage::Store;
+use storage::Store;
 
-pub(super) fn serve(port: u16, store: Arc<Store>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn serve(port: u16, store: Arc<Store>) -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port));
     println!("Listening on: {}", addr);
     let listener = TcpListener::bind(addr)?;
@@ -41,12 +41,12 @@ async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Arc<S
                 Ok(request) => {
                     println!("Received request: {:?}", request);
                     match request.operation {
-                        protocol::Operation::Get => match store.get(&request.key).await {
+                        Operation::Get => match store.get(&request.key).await {
                             Some(value) => {
                                 println!("GET {}: {}", request.key, value);
-                                let res = protocol::Response {
-                                    operation: protocol::Operation::Get,
-                                    status: protocol::Status::Ok,
+                                let res = Response {
+                                    operation: Operation::Get,
+                                    status: Status::Ok,
                                     value: Some(value),
                                 };
                                 stream.write_all(&res.to_bytes()).unwrap();
@@ -65,9 +65,9 @@ async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Arc<S
                             let value = request.value.unwrap();
                             store.set(&request.key, &value).await;
                             println!("SET {}: {:?}", request.key, value);
-                            let res = protocol::Response {
-                                operation: protocol::Operation::Set,
-                                status: protocol::Status::Ok,
+                            let res = Response {
+                                operation: Operation::Set,
+                                status: Status::Ok,
                                 value: None,
                             };
                             stream.write_all(&res.to_bytes()).unwrap();
@@ -75,18 +75,18 @@ async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Arc<S
                         protocol::Operation::Delete => match store.delete(&request.key).await {
                             Some(value) => {
                                 println!("DEL {}: {}", request.key, value);
-                                let res = protocol::Response {
-                                    operation: protocol::Operation::Delete,
-                                    status: protocol::Status::Ok,
+                                let res = Response {
+                                    operation: Operation::Delete,
+                                    status: Status::Ok,
                                     value: Some(value),
                                 };
                                 stream.write_all(&res.to_bytes()).unwrap();
                             }
                             None => {
                                 println!("DEL {}: Key not found", request.key);
-                                let res = protocol::Response {
-                                    operation: protocol::Operation::Delete,
-                                    status: protocol::Status::Error,
+                                let res = Response {
+                                    operation: Operation::Delete,
+                                    status: Status::Error,
                                     value: None,
                                 };
                                 stream.write_all(&res.to_bytes()).unwrap();

@@ -1,0 +1,11 @@
+[package]
+name = "ferrousdb"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+server = { path = "../crates/server" }
+storage = { path = "../crates/storage" }
