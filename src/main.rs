@@ -3,11 +3,10 @@ use storage::Store;
 mod server;
 mod storage;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let port = 8080;
     let store = Store::init();
-    match server::serve(port, store).await {
+    match server::serve(port, store) {
         Ok(_) => {
             println!("Server started on port: {}", port);
         }

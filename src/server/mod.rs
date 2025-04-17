@@ -1,32 +1,37 @@
-use std::net::{Ipv4Addr, SocketAddr};
+use std::{
+    io::{Read, Write},
+    net::{Ipv4Addr, SocketAddr, TcpListener, TcpStream},
+    sync::Arc,
+    thread,
+};
 mod protocol;
 use protocol::Request;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
 
 use crate::storage::Store;
 
-pub(super) async fn serve(port: u16, store: Store) -> Result<(), Box<dyn std::error::Error>> {
+pub(super) fn serve(port: u16, store: Arc<Store>) -> Result<(), Box<dyn std::error::Error>> {
     let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port));
     println!("Listening on: {}", addr);
-    let listener = TcpListener::bind(addr).await?;
+    let listener = TcpListener::bind(addr)?;
 
-    loop {
-        match listener.accept().await {
-            Ok((stream, addr)) => {
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                let store = Arc::clone(&store);
                 println!("Accepted connection from: {}", addr);
-                tokio::spawn(handle_connection(stream, addr, store.clone()));
+                thread::spawn(move || handle_connection(stream, addr, store.clone()));
             }
             Err(e) => {
                 eprintln!("ERROR: Failed to accept connection: {}", e);
             }
         }
     }
+    Ok(())
 }
 
-async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Store) {
+async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Arc<Store>) {
     let mut read_buffer = [0u8; 1024];
-    match stream.read(&mut read_buffer).await {
+    match stream.read(&mut read_buffer) {
         Ok(0) => {
             println!("Connection closed by client: {}", addr);
         }
@@ -44,7 +49,7 @@ async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Store
                                     status: protocol::Status::Ok,
                                     value: Some(value),
                                 };
-                                stream.write_all(&res.to_bytes()).await.unwrap();
+                                stream.write_all(&res.to_bytes()).unwrap();
                             }
                             None => {
                                 println!("GET {}: Key not found", request.key);
@@ -53,7 +58,7 @@ async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Store
                                     status: protocol::Status::Error,
                                     value: None,
                                 };
-                                stream.write_all(&res.to_bytes()).await.unwrap();
+                                stream.write_all(&res.to_bytes()).unwrap();
                             }
                         },
                         protocol::Operation::Set => {
@@ -65,7 +70,7 @@ async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Store
                                 status: protocol::Status::Ok,
                                 value: None,
                             };
-                            stream.write_all(&res.to_bytes()).await.unwrap();
+                            stream.write_all(&res.to_bytes()).unwrap();
                         }
                         protocol::Operation::Delete => match store.delete(&request.key).await {
                             Some(value) => {
@@ -75,7 +80,7 @@ async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Store
                                     status: protocol::Status::Ok,
                                     value: Some(value),
                                 };
-                                stream.write_all(&res.to_bytes()).await.unwrap();
+                                stream.write_all(&res.to_bytes()).unwrap();
                             }
                             None => {
                                 println!("DEL {}: Key not found", request.key);
@@ -84,7 +89,7 @@ async fn handle_connection(mut stream: TcpStream, addr: SocketAddr, store: Store
                                     status: protocol::Status::Error,
                                     value: None,
                                 };
-                                stream.write_all(&res.to_bytes()).await.unwrap();
+                                stream.write_all(&res.to_bytes()).unwrap();
                             }
                         },
                     }
